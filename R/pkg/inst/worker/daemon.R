@@ -15,12 +15,33 @@
 # limitations under the License.
 #
 
+# Logging
+# -------
+#
+# stdout and stderr from this script is copied to the spark logs at INFO level.
+# Since spark normally runs at log level 'WARN', if you want to see output from
+# this script, add the line
+#
+#. setLogLevel('INFO')
+#
+# then you should see output like
+#
+# 2020-08-11 16:16:35 INFO  RRunner:54 - Times: boot = 0.835 s, \
+# init = 0.005 s, broadcast = 0.001 s, read-input = 0.010 s, \
+# compute = 0.001 s, write-output = 1.163 s, total = 2.015 s
+
 # Worker daemon
 
 rLibDir <- Sys.getenv("SPARKR_RLIBDIR")
 connectionTimeout <- as.integer(Sys.getenv("SPARKR_BACKEND_CONNECTION_TIMEOUT", "6000"))
 dirs <- strsplit(rLibDir, ",")[[1]]
 script <- file.path(dirs[[1]], "SparkR", "worker", "worker.R")
+
+Log <- function(...){
+  message("daemon.R: ", ...)
+}
+
+source(script)
 
 # preload SparkR package, speedup worker
 .libPaths(c(dirs, .libPaths()))
@@ -32,10 +53,12 @@ inputCon <- socketConnection(
 
 SparkR:::doServerAuth(inputCon, Sys.getenv("SPARKR_WORKER_SECRET"))
 
-# Waits indefinitely for a socket connecion by default.
+# Waits indefinitely for a socket connection by default.
 selectTimeout <- NULL
 
-while (TRUE) {
+MaybePrintNull <- function(n) if (is.null(n)) 'NULL' else n
+
+process <- function() {
   ready <- socketSelect(list(inputCon), timeout = selectTimeout)
 
   # Note that the children should be terminated in the parent. If each child terminates
@@ -72,31 +95,31 @@ while (TRUE) {
       }
     })
   } else if (is.null(children)) {
-    # If it is NULL, there are no children. Waits indefinitely for a socket connecion.
+    # If it is NULL, there are no children. Waits indefinitely for a socket
+    # connection.
     selectTimeout <- NULL
   }
 
   if (ready) {
     port <- SparkR:::readInt(inputCon)
-    # There is a small chance that it could be interrupted by signal, retry one time
+    # There is a small chance that it could be interrupted by signal, retry
+    # one time
     if (length(port) == 0) {
       port <- SparkR:::readInt(inputCon)
       if (length(port) == 0) {
-        cat("quitting daemon\n")
+        Log("quitting daemon")
         quit(save = "no")
       }
     }
-    p <- parallel:::mcfork()
-    if (inherits(p, "masterProcess")) {
-      # Reach here because this is a child process.
-      close(inputCon)
-      Sys.setenv(SPARKR_WORKER_PORT = port)
-      try(source(script))
-      # Note that this mcexit does not fully terminate this child.
-      parallel:::mcexit(0L)
-    } else {
-      # Forking succeeded and we need to check if they finished their jobs every second.
-      selectTimeout <- 1
-    }
+    selectTimeout <<-
+      MaybeForkedWorker(selectTimeout, inputCon, port)
   }
 }
+
+DieNoisily <- function(condition) {
+  Log(condition, paste0("\n", capture.output(traceback()), "\n"))
+  quit(status = 1, save = "no")
+}
+
+while (TRUE)
+  tryCatch(process(), warning = DieNoisily, error = DieNoisily)

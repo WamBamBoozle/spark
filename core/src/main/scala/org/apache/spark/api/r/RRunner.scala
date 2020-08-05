@@ -73,7 +73,7 @@ private[spark] class RRunner[U](
     // TODO: optimize it to use one socket
 
     // the socket used to send out the input of task
-    serverSocket.setSoTimeout(10000)
+    serverSocket.setSoTimeout(300000)
     dataStream = try {
       val inSocket = serverSocket.accept()
       RRunner.authHelper.authClient(inSocket)
