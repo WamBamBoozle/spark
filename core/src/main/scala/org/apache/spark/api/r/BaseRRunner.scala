@@ -19,10 +19,14 @@ package org.apache.spark.api.r
 
 import java.io._
 import java.net.{InetAddress, ServerSocket}
-import java.util.Arrays
+import java.util.{Arrays, Properties}
 
 import scala.io.Source
 import scala.util.Try
+
+import org.apache.log4j.Level.INFO
+import org.apache.log4j.Logger.getRootLogger
+import org.apache.log4j.PropertyConfigurator
 
 import org.apache.spark._
 import org.apache.spark.broadcast.Broadcast
@@ -45,14 +49,13 @@ private[spark] abstract class BaseRRunner[IN, OUT](
     colNames: Array[String],
     mode: Int)
   extends Logging {
-  protected var bootTime: Double = _
   protected var dataStream: DataInputStream = _
 
   def compute(
       inputIterator: Iterator[IN],
       partitionIndex: Int): Iterator[OUT] = {
     // Timing start
-    bootTime = System.currentTimeMillis / 1000.0
+    val bootTime = System.currentTimeMillis / 1e3
 
     // we expect two connections
     val serverSocket = new ServerSocket(0, 2, InetAddress.getByName("localhost"))
@@ -71,7 +74,7 @@ private[spark] abstract class BaseRRunner[IN, OUT](
     dataStream = try {
       val inSocket = serverSocket.accept()
       BaseRRunner.authHelper.authClient(inSocket)
-      newWriterThread(inSocket.getOutputStream(), inputIterator, partitionIndex).start()
+      newWriterThread(inputIterator, partitionIndex, bootTime, inSocket.getOutputStream).start()
 
       // the socket used to receive the output of task
       val outSocket = serverSocket.accept()
@@ -94,10 +97,12 @@ private[spark] abstract class BaseRRunner[IN, OUT](
   /**
    * Start a thread to write RDD data to the R process.
    */
-  protected def newWriterThread(
-      output: OutputStream,
-      iter: Iterator[IN],
-      partitionIndex: Int): WriterThread
+  protected def
+  newWriterThread(iter: Iterator[IN],
+                  partitionIndex: Int,
+                  bootTime: Double,
+                  output: OutputStream)
+  : WriterThread
 
   abstract class ReaderIterator(
       stream: DataInputStream,
@@ -148,11 +153,10 @@ private[spark] abstract class BaseRRunner[IN, OUT](
   /**
    * The thread responsible for writing the iterator to the R process.
    */
-  abstract class WriterThread(
-      output: OutputStream,
-      iter: Iterator[IN],
-      partitionIndex: Int)
-    extends Thread("writer for R") {
+  abstract class
+  WriterThread(iter: Iterator[IN], partitionIndex: Int, bootTime: Double, output: OutputStream)
+    extends Thread("writer for R")
+  {
 
     private val env = SparkEnv.get
     private val taskContext = TaskContext.get()
@@ -166,6 +170,7 @@ private[spark] abstract class BaseRRunner[IN, OUT](
       try {
         SparkEnv.set(env)
         TaskContext.setTaskContext(taskContext)
+        dataOut.writeDouble(bootTime)
         dataOut.writeInt(partitionIndex)
 
         SerDe.writeString(dataOut, deserializer)
@@ -219,10 +224,6 @@ private[spark] abstract class BaseRRunner[IN, OUT](
   }
 }
 
-private[spark] object SpecialLengths {
-  val TIMING_DATA = -1
-}
-
 private[spark] object RRunnerModes {
   val RDD = 0
   val DATAFRAME_DAPPLY = 1
@@ -251,6 +252,14 @@ private[spark] class BufferedStreamThread(
     }.map { x =>
       lines((x + lineIdx) % errBufferSize)
     }.mkString("\n")
+  }
+}
+
+private[spark] object BufferedStreamThread {
+  def logROutput(): Unit = {
+    val pro = new Properties()
+    pro.put("log4j.logger.org.apache.spark.api.r.BufferedStreamThread", "INFO")
+    PropertyConfigurator.configure(pro)
   }
 }
 
@@ -302,10 +311,19 @@ private[r] object BaseRRunner {
     pb.environment().put("SPARKR_IS_RUNNING_ON_WORKER", "TRUE")
     pb.environment().put("SPARKR_WORKER_SECRET", authHelper.secret)
     pb.environment().put("SPARKR_DAEMON_INIT", sparkConf.get(R_DAEMON_INIT))
+    pb.environment().put("SPARKR_WORKER_VERBOSE", workerVerbose(sparkConf))
     pb.redirectErrorStream(true)  // redirect stderr into stdout
     val proc = pb.start()
     val errThread = startStdoutThread(proc)
     errThread
+  }
+
+  private def workerVerbose(sparkConf: SparkConf): String = {
+    val r = sparkConf.get(R_WORKER_VERBOSE)
+    if (r != "FALSE") {
+      BufferedStreamThread.logROutput()
+    }
+    r
   }
 
   /**
@@ -319,6 +337,14 @@ private[r] object BaseRRunner {
           // we expect one connections
           val serverSocket = new ServerSocket(0, 1, InetAddress.getByName("localhost"))
           val daemonPort = serverSocket.getLocalPort
+
+          // Ensure daemon initialization is logged by ensuring
+          // org.apache.spark.api.r.BufferedStreamThread is at INFO level
+          val rootLogger = getRootLogger
+          val logLevel = rootLogger.getLevel
+          val raiseLogging = logLevel.getSyslogEquivalent < INFO.getSyslogEquivalent
+          if(raiseLogging) rootLogger.setLevel(INFO)
+
           errThread = createRProcess(daemonPort, "daemon.R")
           // the socket used to send out the input of task
           serverSocket.setSoTimeout(SparkEnv.get.conf.get(R_DAEMON_TIMEOUT))
@@ -328,6 +354,7 @@ private[r] object BaseRRunner {
             daemonChannel = new DataOutputStream(new BufferedOutputStream(sock.getOutputStream))
           } finally {
             serverSocket.close()
+            if(raiseLogging) rootLogger.setLevel(logLevel)
           }
         }
         try {

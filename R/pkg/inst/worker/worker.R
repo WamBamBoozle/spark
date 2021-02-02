@@ -27,6 +27,11 @@ elapsedSecs <- function() {
   proc.time()[3]
 }
 
+# Verbose is the spark.r.workerVerbose configuration
+Verbose <- parse(text = Sys.getenv("SPARKR_WORKER_VERBOSE"))
+
+rotate <<- 0
+
 compute <- function(mode, partition, serializer, deserializer, key,
              colNames, computeFunc, inputData) {
   if (mode > 0) {
@@ -37,12 +42,14 @@ compute <- function(mode, partition, serializer, deserializer, key,
       oldOpt <- getOption("stringsAsFactors")
       options(stringsAsFactors = FALSE)
 
+      rotateStart <- elapsedSecs()
       # Handle binary data types
       if ("raw" %in% sapply(inputData[[1]], class)) {
         inputData <- SparkR:::rbindRaws(inputData)
       } else {
         inputData <- do.call(rbind.data.frame, inputData)
       }
+      rotate <<- rotate + elapsedSecs() - rotateStart
 
       options(stringsAsFactors = oldOpt)
 
@@ -85,20 +92,11 @@ outputResult <- function(serializer, output, outputCon) {
 }
 
 # Constants
-specialLengths <- list(END_OF_STREAM = 0L, TIMING_DATA = -1L)
-
-# Timing R process boot
-bootTime <- currentTimeSecs()
-bootElap <- elapsedSecs()
+specialLengths <- list(END_OF_STREAM = 0L)
 
 rLibDir <- Sys.getenv("SPARKR_RLIBDIR")
 connectionTimeout <- as.integer(Sys.getenv("SPARKR_BACKEND_CONNECTION_TIMEOUT", "6000"))
 dirs <- strsplit(rLibDir, ",")[[1]]
-# Set libPaths to include SparkR package as loadNamespace needs this
-# TODO: Figure out if we can avoid this by not loading any objects that require
-# SparkR namespace
-.libPaths(c(dirs, .libPaths()))
-suppressPackageStartupMessages(library(SparkR))
 
 port <- as.integer(Sys.getenv("SPARKR_WORKER_PORT"))
 inputCon <- socketConnection(
@@ -108,6 +106,11 @@ SparkR:::doServerAuth(inputCon, Sys.getenv("SPARKR_WORKER_SECRET"))
 outputCon <- socketConnection(
     port = port, blocking = TRUE, open = "wb", timeout = connectionTimeout)
 SparkR:::doServerAuth(outputCon, Sys.getenv("SPARKR_WORKER_SECRET"))
+
+# bootTime is when the executer asked for a worker
+bootTime <- SparkR:::readDouble(inputCon)
+boot <- currentTimeSecs() - bootTime
+bootElap <- elapsedSecs()
 
 # read the index of the current partition inside the RDD
 partition <- SparkR:::readInt(inputCon)
@@ -160,7 +163,9 @@ isEmpty <- SparkR:::readInt(inputCon)
 computeInputElapsDiff <- 0
 outputComputeElapsDiff <- 0
 
-if (isEmpty != 0) {
+if (isEmpty == 0)
+  msg <- "empty"
+else {
   if (numPartitions == -1) {
     if (deserializer == "byte") {
       # Now read as many characters as described in funcLen
@@ -189,16 +194,21 @@ if (isEmpty != 0) {
     inputElap <- elapsedSecs()
     if (mode > 0) {
       if (mode == 1) {
+        msg <- "dapply"
         output <- compute(mode, partition, serializer, deserializer, NULL,
                     colNames, computeFunc, data)
        } else {
         # gapply mode
         outputs <- list()
-        for (i in seq_len(length(data))) {
+        groupCount <- length(data)
+        rowCount <- 0
+        for (i in seq_len(groupCount)) {
           # Timing reading input data for execution
           computeStart <- elapsedSecs()
+          rows <- data[[i]]
+          rowCount <- rowCount + length(rows)
           output <- compute(mode, partition, serializer, deserializer, keys[[i]],
-                      colNames, computeFunc, data[[i]])
+                            colNames, computeFunc, rows)
           computeElap <- elapsedSecs()
           if (serializer == "arrow") {
             outputs[[length(outputs) + 1L]] <- output
@@ -217,8 +227,10 @@ if (isEmpty != 0) {
           SparkR:::writeSerializeInArrow(outputCon, combined)
           outputComputeElapsDiff <- elapsedSecs() - outputStart
         }
+        msg <- paste0("gapply: groups = ", groupCount, ", rows = ", rowCount)
       }
     } else {
+      msg <- "rdd"
       output <- compute(mode, partition, serializer, deserializer, NULL,
                   colNames, computeFunc, data)
     }
@@ -231,6 +243,7 @@ if (isEmpty != 0) {
       outputComputeElapsDiff <- outputElap - computeElap
     }
   } else {
+    msg <- paste("pairwise RDD of", numPartitions, "partitions")
     if (deserializer == "byte") {
       # Now read as many characters as described in funcLen
       data <- SparkR:::readDeserialize(inputCon)
@@ -275,15 +288,17 @@ if (isEmpty != 0) {
     outputComputeElapsDiff <- outputElap - computeElap
   }
 }
-
-# Report timing
-SparkR:::writeInt(outputCon, specialLengths$TIMING_DATA)
-SparkR:::writeDouble(outputCon, bootTime)
-SparkR:::writeDouble(outputCon, initElap - bootElap)        # init
-SparkR:::writeDouble(outputCon, broadcastElap - initElap)   # broadcast
-SparkR:::writeDouble(outputCon, inputElap - broadcastElap)  # input
-SparkR:::writeDouble(outputCon, computeInputElapsDiff)    # compute
-SparkR:::writeDouble(outputCon, outputComputeElapsDiff)   # output
+if (eval(Verbose)) {
+  init <- initElap - bootElap
+  broadcast <- broadcastElap - initElap
+  input <- inputElap - broadcastElap
+  compute <- computeInputElapsDiff - rotate
+  timings <- sprintf(
+    "boot = %.3f s, init = %.3f s, broadcast = %.3f s, input = %.3f s, rotate = %.3f s, compute = %.3f s, output = %.3f s, total = %.3f s",
+    boot, init, broadcast, input, rotate, compute, outputComputeElapsDiff,
+    boot + init + broadcast + input + rotate + compute + outputComputeElapsDiff)
+  message("worker.R: ", msg, ", deserializer = ", deserializer, ", serializer = ", serializer, ", ", timings)
+}
 
 # End of output
 SparkR:::writeInt(outputCon, specialLengths$END_OF_STREAM)
