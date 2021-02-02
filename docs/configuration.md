@@ -9,9 +9,9 @@ license: |
   The ASF licenses this file to You under the Apache License, Version 2.0
   (the "License"); you may not use this file except in compliance with
   the License.  You may obtain a copy of the License at
- 
+
      http://www.apache.org/licenses/LICENSE-2.0
- 
+
   Unless required by applicable law or agreed to in writing, software
   distributed under the License is distributed on an "AS IS" BASIS,
   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -74,7 +74,7 @@ The following format is accepted:
     1p or 1pb (pebibytes = 1024 tebibytes)
 
 While numbers without units are generally interpreted as bytes, a few are interpreted as KiB or MiB.
-See documentation of individual configuration properties. Specifying units is desirable where 
+See documentation of individual configuration properties. Specifying units is desirable where
 possible.
 
 ## Dynamically Loading Spark Properties
@@ -157,8 +157,8 @@ of the most common options to set are:
   <td><code>spark.driver.maxResultSize</code></td>
   <td>1g</td>
   <td>
-    Limit of total size of serialized results of all partitions for each Spark action (e.g. 
-    collect) in bytes. Should be at least 1M, or 0 for unlimited. Jobs will be aborted if the total 
+    Limit of total size of serialized results of all partitions for each Spark action (e.g.
+    collect) in bytes. Should be at least 1M, or 0 for unlimited. Jobs will be aborted if the total
     size is above this limit.
     Having a high limit may cause out-of-memory errors in driver (depends on spark.driver.memory
     and memory overhead of objects in JVM). Setting a proper limit can protect the driver from
@@ -187,13 +187,13 @@ of the most common options to set are:
   <td>
     Amount of non-heap memory to be allocated per driver process in cluster mode, in MiB unless
     otherwise specified. This is memory that accounts for things like VM overheads, interned strings,
-    other native overheads, etc. This tends to grow with the container size (typically 6-10%). 
+    other native overheads, etc. This tends to grow with the container size (typically 6-10%).
     This option is currently supported on YARN, Mesos and Kubernetes.
-    <em>Note:</em> Non-heap memory includes off-heap memory 
+    <em>Note:</em> Non-heap memory includes off-heap memory
     (when <code>spark.memory.offHeap.enabled=true</code>) and memory used by other driver processes
-    (e.g. python process that goes with a PySpark driver) and memory used by other non-driver 
-    processes running in the same container. The maximum memory size of container to running 
-    driver is determined by the sum of <code>spark.driver.memoryOverhead</code> 
+    (e.g. python process that goes with a PySpark driver) and memory used by other non-driver
+    processes running in the same container. The maximum memory size of container to running
+    driver is determined by the sum of <code>spark.driver.memoryOverhead</code>
     and <code>spark.driver.memory</code>.
   </td>
   <td>2.3.0</td>
@@ -264,8 +264,8 @@ of the most common options to set are:
     shared with other non-JVM processes. When PySpark is run in YARN or Kubernetes, this memory
     is added to executor resource requests.
     <br/>
-    <em>Note:</em> This feature is dependent on Python's `resource` module; therefore, the behaviors and 
-    limitations are inherited. For instance, Windows does not support resource limiting and actual 
+    <em>Note:</em> This feature is dependent on Python's `resource` module; therefore, the behaviors and
+    limitations are inherited. For instance, Windows does not support resource limiting and actual
     resource is not limited on MacOS.
   </td>
   <td>2.4.0</td>
@@ -278,11 +278,11 @@ of the most common options to set are:
     This is memory that accounts for things like VM overheads, interned strings, other native overheads, etc.
     This tends to grow with the executor size (typically 6-10%). This option is currently supported on YARN and Kubernetes.
     <br/>
-    <em>Note:</em> Additional memory includes PySpark executor memory 
+    <em>Note:</em> Additional memory includes PySpark executor memory
     (when <code>spark.executor.pyspark.memory</code> is not configured) and memory used by other
-    non-executor processes running in the same container. The maximum memory size of container to 
-    running executor is determined by the sum of <code>spark.executor.memoryOverhead</code>, 
-    <code>spark.executor.memory</code>, <code>spark.memory.offHeap.size</code> and 
+    non-executor processes running in the same container. The maximum memory size of container to
+    running executor is determined by the sum of <code>spark.executor.memoryOverhead</code>,
+    <code>spark.executor.memory</code>, <code>spark.memory.offHeap.size</code> and
     <code>spark.executor.pyspark.memory</code>.
   </td>
   <td>2.3.0</td>
@@ -822,8 +822,8 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.reducer.maxSizeInFlight</code></td>
   <td>48m</td>
   <td>
-    Maximum size of map outputs to fetch simultaneously from each reduce task, in MiB unless 
-    otherwise specified. Since each output requires us to create a buffer to receive it, this 
+    Maximum size of map outputs to fetch simultaneously from each reduce task, in MiB unless
+    otherwise specified. Since each output requires us to create a buffer to receive it, this
     represents a fixed memory overhead per reduce task, so keep it small unless you have a
     large amount of memory.
   </td>
@@ -865,8 +865,8 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.shuffle.file.buffer</code></td>
   <td>32k</td>
   <td>
-    Size of the in-memory buffer for each shuffle file output stream, in KiB unless otherwise 
-    specified. These buffers reduce the number of disk seeks and system calls made in creating 
+    Size of the in-memory buffer for each shuffle file output stream, in KiB unless otherwise
+    specified. These buffers reduce the number of disk seeks and system calls made in creating
     intermediate shuffle files.
   </td>
   <td>1.4.0</td>
@@ -985,8 +985,8 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.shuffle.accurateBlockThreshold</code></td>
   <td>100 * 1024 * 1024</td>
   <td>
-    Threshold in bytes above which the size of shuffle blocks in HighlyCompressedMapStatus is 
-    accurately recorded. This helps to prevent OOM by avoiding underestimating shuffle 
+    Threshold in bytes above which the size of shuffle blocks in HighlyCompressedMapStatus is
+    accurately recorded. This helps to prevent OOM by avoiding underestimating shuffle
     block size when fetch shuffle blocks.
   </td>
   <td>2.2.1</td>
@@ -1388,7 +1388,7 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.io.compression.snappy.blockSize</code></td>
   <td>32k</td>
   <td>
-    Block size in Snappy compression, in the case when Snappy compression codec is used. 
+    Block size in Snappy compression, in the case when Snappy compression codec is used.
     Lowering this block size will also lower shuffle memory usage when Snappy is used.
     Default unit is bytes, unless otherwise specified.
   </td>
@@ -1483,7 +1483,7 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.kryoserializer.buffer</code></td>
   <td>64k</td>
   <td>
-    Initial size of Kryo's serialization buffer, in KiB unless otherwise specified. 
+    Initial size of Kryo's serialization buffer, in KiB unless otherwise specified.
     Note that there will be one buffer <i>per core</i> on each worker. This buffer will grow up to
     <code>spark.kryoserializer.buffer.max</code> if needed.
   </td>
@@ -1565,7 +1565,7 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.memory.offHeap.enabled</code></td>
   <td>false</td>
   <td>
-    If true, Spark will attempt to use off-heap memory for certain operations. If off-heap memory 
+    If true, Spark will attempt to use off-heap memory for certain operations. If off-heap memory
     use is enabled, then <code>spark.memory.offHeap.size</code> must be positive.
   </td>
   <td>1.6.0</td>
@@ -1575,7 +1575,7 @@ Apart from these, the following properties are also available, and may be useful
   <td>0</td>
   <td>
     The absolute amount of memory which can be used for off-heap allocation, in bytes unless otherwise specified.
-    This setting has no impact on heap memory usage, so if your executors' total memory consumption 
+    This setting has no impact on heap memory usage, so if your executors' total memory consumption
     must fit within some hard limit then be sure to shrink your JVM heap size accordingly.
     This must be set to a positive value when <code>spark.memory.offHeap.enabled=true</code>.
   </td>
@@ -1646,8 +1646,8 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.broadcast.blockSize</code></td>
   <td>4m</td>
   <td>
-    Size of each piece of a block for <code>TorrentBroadcastFactory</code>, in KiB unless otherwise 
-    specified. Too large a value decreases parallelism during broadcast (makes it slower); however, 
+    Size of each piece of a block for <code>TorrentBroadcastFactory</code>, in KiB unless otherwise
+    specified. Too large a value decreases parallelism during broadcast (makes it slower); however,
     if it is too small, <code>BlockManager</code> might take a performance hit.
   </td>
   <td>0.5.0</td>
@@ -1784,7 +1784,7 @@ Apart from these, the following properties are also available, and may be useful
   <td>2m</td>
   <td>
     Size of a block above which Spark memory maps when reading a block from disk. Default unit is bytes,
-    unless specified otherwise. This prevents Spark from memory mapping very small blocks. In general, 
+    unless specified otherwise. This prevents Spark from memory mapping very small blocks. In general,
     memory mapping has high overhead for blocks close to or below the page size of the operating system.
   </td>
   <td>0.9.2</td>
@@ -2095,10 +2095,10 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.scheduler.listenerbus.eventqueue.capacity</code></td>
   <td>10000</td>
   <td>
-    The default capacity for event queues. Spark will try to initialize an event queue 
-    using capacity specified by `spark.scheduler.listenerbus.eventqueue.queueName.capacity` 
-    first. If it's not configured, Spark will use the default capacity specified by this 
-    config. Note that capacity must be greater than 0. Consider increasing value (e.g. 20000) 
+    The default capacity for event queues. Spark will try to initialize an event queue
+    using capacity specified by `spark.scheduler.listenerbus.eventqueue.queueName.capacity`
+    first. If it's not configured, Spark will use the default capacity specified by this
+    config. Note that capacity must be greater than 0. Consider increasing value (e.g. 20000)
     if listener events are dropped. Increasing this value may result in the driver using more memory.
   </td>
   <td>2.3.0</td>
@@ -2258,9 +2258,9 @@ Apart from these, the following properties are also available, and may be useful
   <td><code>spark.excludeOnFailure.killExcludedExecutors</code></td>
   <td>false</td>
   <td>
-    (Experimental) If set to "true", allow Spark to automatically kill the executors 
-    when they are excluded on fetch failure or excluded for the entire application, 
-    as controlled by spark.killExcludedExecutors.application.*. Note that, when an entire node is added 
+    (Experimental) If set to "true", allow Spark to automatically kill the executors
+    when they are excluded on fetch failure or excluded for the entire application,
+    as controlled by spark.killExcludedExecutors.application.*. Note that, when an entire node is added
     excluded, all of the executors on that node will be killed.
   </td>
   <td>2.2.0</td>
@@ -2336,13 +2336,13 @@ Apart from these, the following properties are also available, and may be useful
   <td>1</td>
   <td>
     Amount of a particular resource type to allocate for each task, note that this can be a double.
-    If this is specified you must also provide the executor config 
-    <code>spark.executor.resource.{resourceName}.amount</code> and any corresponding discovery configs 
-    so that your executors are created with that resource type. In addition to whole amounts, 
-    a fractional amount (for example, 0.25, which means 1/4th of a resource) may be specified. 
+    If this is specified you must also provide the executor config
+    <code>spark.executor.resource.{resourceName}.amount</code> and any corresponding discovery configs
+    so that your executors are created with that resource type. In addition to whole amounts,
+    a fractional amount (for example, 0.25, which means 1/4th of a resource) may be specified.
     Fractional amounts must be less than or equal to 0.5, or in other words, the minimum amount of
-    resource sharing is 2 tasks per resource. Additionally, fractional amounts are floored 
-    in order to assign resource slots (e.g. a 0.2222 configuration, or 1/0.2222 slots will become 
+    resource sharing is 2 tasks per resource. Additionally, fractional amounts are floored
+    in order to assign resource slots (e.g. a 0.2222 configuration, or 1/0.2222 slots will become
     4 tasks/resource, not 5).
   </td>
   <td>3.0.0</td>
@@ -2595,11 +2595,11 @@ Apart from these, the following properties are also available, and may be useful
 
 ### Thread Configurations
 
-Depending on jobs and cluster configurations, we can set number of threads in several places in Spark to utilize 
-available resources efficiently to get better performance. Prior to Spark 3.0, these thread configurations apply 
-to all roles of Spark, such as driver, executor, worker and master. From Spark 3.0, we can configure threads in 
+Depending on jobs and cluster configurations, we can set number of threads in several places in Spark to utilize
+available resources efficiently to get better performance. Prior to Spark 3.0, these thread configurations apply
+to all roles of Spark, such as driver, executor, worker and master. From Spark 3.0, we can configure threads in
 finer granularity starting from driver and executor. Take RPC module as example in below table. For other modules,
-like shuffle, just replace "rpc" with "shuffle" in the property names except 
+like shuffle, just replace "rpc" with "shuffle" in the property names except
 <code>spark.{driver|executor}.rpc.netty.dispatcher.numThreads</code>, which is only for RPC module.
 
 <table class="table">
@@ -2630,10 +2630,10 @@ like shuffle, just replace "rpc" with "shuffle" in the property names except
 </tr>
 </table>
 
-The default value for number of thread-related config keys is the minimum of the number of cores requested for 
+The default value for number of thread-related config keys is the minimum of the number of cores requested for
 the driver or executor, or, in the absence of that value, the number of cores available for the JVM (with a hardcoded upper limit of 8).
 
-    
+
 ### Security
 
 Please refer to the [Security](security.html) page for available options on how to secure different
@@ -3048,11 +3048,11 @@ val sc = new SparkContext(conf)
 
 Also, you can modify or add configurations at runtime:
 {% highlight bash %}
-./bin/spark-submit \ 
-  --name "My app" \ 
-  --master local[4] \  
-  --conf spark.eventLog.enabled=false \ 
-  --conf "spark.executor.extraJavaOptions=-XX:+PrintGCDetails -XX:+PrintGCTimeStamps" \ 
+./bin/spark-submit \
+  --name "My app" \
+  --master local[4] \
+  --conf spark.eventLog.enabled=false \
+  --conf "spark.executor.extraJavaOptions=-XX:+PrintGCDetails -XX:+PrintGCTimeStamps" \
   --conf spark.hadoop.abc.def=xyz \
   --conf spark.hive.abc=xyz
   myApp.jar

@@ -87,7 +87,7 @@ private[spark] object RUtils {
     } else {
       // Otherwise, assume the package is local
       val sparkRPkgPath = localSparkRPackagePath.getOrElse {
-          throw new SparkException("SPARK_HOME not set. Can't locate SparkR package.")
+        throw new SparkException("SPARK_HOME not set. Can't locate SparkR package.")
       }
       if (!rPackages.isEmpty) {
         Seq(sparkRPkgPath, rPackages.get)

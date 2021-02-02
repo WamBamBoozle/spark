@@ -54,4 +54,10 @@ private[spark] object R {
     .version("3.2.0")
     .intConf
     .createWithDefault(10000)
+
+  /** Log Timing Info. Must be set to an R boolean expression. */
+  val R_WORKER_VERBOSE = ConfigBuilder("spark.r.workerVerbose")
+    .version("3.2.0")
+    .stringConf
+    .createWithDefault("FALSE")
 }

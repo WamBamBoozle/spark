@@ -92,40 +92,19 @@ private[spark] class RRunner[IN, OUT](
        * When the stream reaches end of data, needs to process the following sections,
        * and then returns null.
        */
-      override protected def read(): OUT = {
+      override protected def read(): OUT =
         try {
-          val length = dataStream.readInt()
-
-          length match {
-            case SpecialLengths.TIMING_DATA =>
-              // Timing data from R worker
-              val boot = dataStream.readDouble - bootTime
-              val init = dataStream.readDouble
-              val broadcast = dataStream.readDouble
-              val input = dataStream.readDouble
-              val compute = dataStream.readDouble
-              val output = dataStream.readDouble
-              logInfo(
-                ("Times: boot = %.3f s, init = %.3f s, broadcast = %.3f s, " +
-                  "read-input = %.3f s, compute = %.3f s, write-output = %.3f s, " +
-                  "total = %.3f s").format(
-                  boot,
-                  init,
-                  broadcast,
-                  input,
-                  compute,
-                  output,
-                  boot + init + broadcast + input + compute + output))
-              read()
+          dataStream.readInt() match {
             case length if length > 0 =>
               readData(length).asInstanceOf[OUT]
             case length if length == 0 =>
               // End of stream
               eos = true
               null.asInstanceOf[OUT]
+            case length =>
+              throw new Exception("weird length returned from R worker: " + length)
           }
         } catch handleException
-      }
     }
   }
 
@@ -133,10 +112,11 @@ private[spark] class RRunner[IN, OUT](
    * Start a thread to write RDD data to the R process.
    */
   protected override def newWriterThread(
-      output: OutputStream,
-      iter: Iterator[IN],
-      partitionIndex: Int): WriterThread = {
-    new WriterThread(output, iter, partitionIndex) {
+                                          iter: Iterator[IN],
+                                          partitionIndex: Int,
+                                          bootTime: Double,
+                                          output: OutputStream)
+  : WriterThread = new WriterThread(iter, partitionIndex, bootTime, output) {
 
       /**
        * Writes input data to the stream connected to the R worker.
@@ -175,5 +155,4 @@ private[spark] class RRunner[IN, OUT](
         }
       }
     }
-  }
 }

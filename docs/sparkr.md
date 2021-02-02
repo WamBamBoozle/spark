@@ -756,6 +756,63 @@ You can inspect the search path in R with [`search()`](https://stat.ethz.ch/R-ma
 The migration guide is now archived [on this page](sparkr-migration-guide.html).
 
 
+# Logging
+
+In normal interactive use of SparkR, logging is at the WARN level.
+The R output from the workers is cached so if an error occurs we
+can play back the last few lines. You can force SparkR to log all
+R output by calling
+
+```R
+setLogLevel('INFO')
+```
+
+Beyond that, there is the spark.r.workerVerbose configuration, a boolean
+expression that, when true, does two things
+
+  1) logs R output regardless of the current log level because
+     the Scala class BaseRRunner sets the log4j configuration
+
+       log4j.logger.org.apache.spark.api.r.BufferedStreamThread=INFO
+
+  2) logs timing and other info as a one-line summary report when the
+     SparkR worker function exits on the executor.
+
+You'll see lines like this
+```                                                                                                                                                    (0 + 1) / 1]
+20/12/18 21:46:34 INFO BufferedStreamThread: worker.R: gapply: groups = 72, deserializer = row, serializer = row, init = 0.010 s, broadcast = 0.000 s, input = 120.275 s, rotate = 12.062 s, compute = 1680.161 s, output = 0.004 s
+```
+The above example was for a partition that took over 30 minutes
+to process 72 groups. 93% of the time was "compute".
+
+The timing values are from the point
+of view of the sparkR worker processing a partition:
+
+ * boot -- the daemon forks the worker and the worker sets up its sockets
+
+ * init -- read the user function and its environment
+
+ * broadcast -- load broadcast variables
+
+ * input -- read the input rows for all groups
+
+ * for each group
+
+   * rotate -- convert from Spark-row to R-column format
+
+   * compute -- run your worker function in memory
+
+ * output -- write the results
+
+(experimental) since it is eval'd in the sparkR Worker function in
+[worker.R](../R/pkg/inst/worker/worker.R), you can restrict summary
+report logging to gapply calls with
+
+```R
+sparkR.session(spark.r.workerVerbose = 'mode == 2')
+```
+
+
 # Daemon Initialization
 
 If your worker function has a lengthy initialization, and your
@@ -795,11 +852,6 @@ A real-world example:
 
 55 hours saved in total. 55 hours / 700 executors ~= 5 minutes per executor.
 
-## Warning
-
-If your initialization takes longer than 10 seconds, consider increasing
-the configuration spark.r.daemonTimeout.
-
 
 ## Examples
 
@@ -825,3 +877,9 @@ YARN creates a directory for the new executor, unzips 'wow.zip' in some
 other directory, and then provides a symlink to it called
 ./wowTarget. When the executor starts the daemon, the daemon loads
 library(wow) from the newly created wowTarget.
+
+
+## Warning
+
+If your initialization takes longer than 10 seconds, consider
+increasing the configuration [spark.r.daemonTimeout](configuration.md#sparkr).

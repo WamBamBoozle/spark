@@ -28,7 +28,6 @@ import org.apache.arrow.vector.util.ByteArrayReadableSeekableByteChannel
 
 import org.apache.spark.TaskContext
 import org.apache.spark.api.r._
-import org.apache.spark.api.r.SpecialLengths
 import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.execution.arrow.ArrowWriter
@@ -72,11 +71,12 @@ class ArrowRRunner(
     dataOut.write(data)
   }
 
-  protected override def newWriterThread(
-      output: OutputStream,
-      inputIterator: Iterator[Iterator[InternalRow]],
-      partitionIndex: Int): WriterThread = {
-    new WriterThread(output, inputIterator, partitionIndex) {
+  protected override def newWriterThread(inputIterator: Iterator[Iterator[InternalRow]],
+                                         partitionIndex: Int,
+                                         bootTime: Double,
+                                         output: OutputStream)
+  : WriterThread = {
+    new WriterThread(inputIterator, partitionIndex, bootTime, output) {
 
       /**
        * Writes input data to the stream connected to the R worker.
@@ -147,31 +147,10 @@ class ArrowRRunner(
           } else {
             reader.close(false)
             allocator.close()
-            // Should read timing data after this.
             read()
           }
         } else {
           dataStream.readInt() match {
-            case SpecialLengths.TIMING_DATA =>
-              // Timing data from R worker
-              val boot = dataStream.readDouble - bootTime
-              val init = dataStream.readDouble
-              val broadcast = dataStream.readDouble
-              val input = dataStream.readDouble
-              val compute = dataStream.readDouble
-              val output = dataStream.readDouble
-              logInfo(
-                ("Times: boot = %.3f s, init = %.3f s, broadcast = %.3f s, " +
-                  "read-input = %.3f s, compute = %.3f s, write-output = %.3f s, " +
-                  "total = %.3f s").format(
-                  boot,
-                  init,
-                  broadcast,
-                  input,
-                  compute,
-                  output,
-                  boot + init + broadcast + input + compute + output))
-              read()
             case length if length > 0 =>
               // Likewise, there looks no way to send each batch in streaming format via socket
               // connection. See ARROW-4512.
@@ -189,6 +168,8 @@ class ArrowRRunner(
               // End of stream
               eos = true
               null
+            case length =>
+              throw new Exception("weird length returned from R worker: " + length)
           }
         }
       } catch handleException
