@@ -779,8 +779,8 @@ expression that, when true, does two things
      SparkR worker function exits on the executor.
 
 You'll see lines like this
-```                                                                                                                                                    (0 + 1) / 1]
-20/12/18 21:46:34 INFO BufferedStreamThread: worker.R: gapply: groups = 72, deserializer = row, serializer = row, init = 0.010 s, broadcast = 0.000 s, input = 120.275 s, rotate = 12.062 s, compute = 1680.161 s, output = 0.004 s
+```
+20/12/18 21:46:34 INFO BufferedStreamThread: worker.R: gapply: groups = 72, rows = 17980000, deserializer = row, serializer = row, init = 0.010 s, broadcast = 0.000 s, input = 120.275 s, rotate = 12.062 s, compute = 1680.161 s, output = 0.004 s
 ```
 The above example was for a partition that took over 30 minutes
 to process 72 groups. 93% of the time was "compute".
